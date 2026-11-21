@@ -19,6 +19,11 @@ services:
 
   noctia_backend:
     build: .
+    volumes:
+      - .:/app:Z                  # live source (rootless podman: container root == your user)
+      - noctia_deps:/app/deps     # container-owned deps, no clash with host deps/
+      - noctia_build:/app/_build  # container-owned build artifacts
+      - noctia_mix:/root/.mix     # persists hex/rebar archives
     depends_on:
       postgres:
         condition: service_healthy
@@ -29,8 +34,13 @@ services:
     environment:
       DB_USER: postgres
       DB_PASS: postgres
-      DB_NAME: noctia_dev
       DB_HOST: postgres
+      DB_NAME: noctia_dev
+    # first boot / dep changes: podman compose exec noctia_backend mix deps.get
+    command: sh -c "mix deps.get && mix ecto.migrate && mix phx.server"
 
 volumes:
   postgres_noctia_data: {}
+  noctia_deps: {}
+  noctia_build: {}
+  noctia_mix: {}
