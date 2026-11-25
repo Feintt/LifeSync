@@ -1,6 +1,8 @@
 defmodule NoctiaWeb.Router do
   use NoctiaWeb, :router
 
+  import NoctiaWeb.UserAuth
+
   pipeline :browser do
     plug :accepts, ["html"]
     plug :fetch_session
@@ -8,6 +10,7 @@ defmodule NoctiaWeb.Router do
     plug :put_root_layout, html: {NoctiaWeb.Layouts, :root}
     plug :protect_from_forgery
     plug :put_secure_browser_headers
+    plug :fetch_current_scope_for_user
   end
 
   pipeline :api do
@@ -39,5 +42,29 @@ defmodule NoctiaWeb.Router do
 
       live_dashboard "/dashboard", metrics: NoctiaWeb.Telemetry
     end
+  end
+
+  ## Authentication routes
+
+  scope "/", NoctiaWeb do
+    pipe_through [:browser, :require_authenticated_user]
+
+    live_session :require_authenticated_user,
+      on_mount: [{NoctiaWeb.UserAuth, :require_authenticated}] do
+      live "/users/settings", UserLive.Settings, :edit
+    end
+  end
+
+  scope "/", NoctiaWeb do
+    pipe_through [:browser]
+
+    live_session :current_user,
+      on_mount: [{NoctiaWeb.UserAuth, :mount_current_scope}] do
+      live "/users/register", UserLive.Registration, :new
+      live "/users/log-in", UserLive.Login, :new
+    end
+
+    post "/users/log-in", UserSessionController, :create
+    delete "/users/log-out", UserSessionController, :delete
   end
 end
