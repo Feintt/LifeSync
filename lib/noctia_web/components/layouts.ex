@@ -12,18 +12,8 @@ defmodule NoctiaWeb.Layouts do
   embed_templates "layouts/*"
 
   @doc """
-  Renders your app layout.
-
-  This function is typically invoked from every template,
-  and it often contains your application menu, sidebar,
-  or similar.
-
-  ## Examples
-
-      <Layouts.app flash={@flash}>
-        <h1>Content</h1>
-      </Layouts.app>
-
+  Renders the app layout: a top bar (settings and log out when logged in)
+  followed by the page content.
   """
   attr :flash, :map, required: true, doc: "the map of flash messages"
 
@@ -37,29 +27,24 @@ defmodule NoctiaWeb.Layouts do
     ~H"""
     <header class="navbar px-4 sm:px-6 lg:px-8">
       <div class="flex-1">
-        <a href="/" class="flex-1 flex w-fit items-center gap-2">
-          <img src={~p"/images/logo.svg"} width="36" />
-          <span class="text-sm font-semibold">v{Application.spec(:phoenix, :vsn)}</span>
-        </a>
+        <.link navigate={~p"/"} class="text-lg font-semibold tracking-tight">Noctia</.link>
       </div>
-      <div class="flex-none">
-        <ul class="flex px-1 space-x-4 items-center">
+      <ul class="flex-none flex items-center gap-2">
+        <%= if @current_scope do %>
+          <li class="text-sm opacity-70 px-2">{@current_scope.user.username}</li>
           <li>
-            <a href="https://phoenixframework.org/" class="btn btn-ghost">Website</a>
+            <.link id="settings-link" navigate={~p"/users/settings"} class="btn btn-ghost btn-sm">
+              <.icon name="hero-cog-6-tooth" class="size-4" /> Settings
+            </.link>
           </li>
           <li>
-            <a href="https://github.com/phoenixframework/phoenix" class="btn btn-ghost">GitHub</a>
+            <.link href={~p"/users/log-out"} method="delete" class="btn btn-ghost btn-sm">
+              <.icon name="hero-arrow-right-start-on-rectangle" class="size-4" /> Log out
+            </.link>
           </li>
-          <li>
-            <.theme_toggle />
-          </li>
-          <li>
-            <a href="https://phoenix.hexdocs.pm/overview.html" class="btn btn-primary">
-              Get Started <span aria-hidden="true">&rarr;</span>
-            </a>
-          </li>
-        </ul>
-      </div>
+        <% end %>
+        <li><.theme_toggle /></li>
+      </ul>
     </header>
 
     <main class="px-4 py-20 sm:px-6 lg:px-8">

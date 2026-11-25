@@ -17,12 +17,6 @@ defmodule NoctiaWeb.Router do
     plug :accepts, ["json"]
   end
 
-  scope "/", NoctiaWeb do
-    pipe_through :browser
-
-    get "/", PageController, :home
-  end
-
   # Other scopes may use custom stacks.
   # scope "/api", NoctiaWeb do
   #   pipe_through :api
@@ -51,6 +45,7 @@ defmodule NoctiaWeb.Router do
 
     live_session :require_authenticated_user,
       on_mount: [{NoctiaWeb.UserAuth, :require_authenticated}] do
+      live "/", HomeLive, :index
       live "/users/settings", UserLive.Settings, :edit
     end
   end
