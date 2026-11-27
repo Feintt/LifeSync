@@ -8,16 +8,34 @@ defmodule NoctiaWeb.UserLive.Registration do
     ~H"""
     <Layouts.app flash={@flash} current_scope={@current_scope}>
       <div class="mx-auto max-w-sm">
-        <div class="text-center">
+        <div :if={@recovery_codes} id="recovery-codes" class="space-y-4">
+          <.header>
+            Save your recovery codes
+            <:subtitle>
+              They are the only way to reset your password. Each code works once and
+              they will not be shown again.
+            </:subtitle>
+          </.header>
+          <ul class="grid grid-cols-1 gap-1 rounded-box bg-base-200 p-4 font-mono text-sm">
+            <li :for={code <- @recovery_codes}>{code}</li>
+          </ul>
+          <.button id="continue-button" phx-click="continue" class="btn btn-primary w-full">
+            I saved my codes, continue
+          </.button>
+        </div>
+
+        <div :if={!@recovery_codes} class="text-center">
           <.header>
             Create your account
             <:subtitle>This is a one-time setup. Registration closes afterwards.</:subtitle>
           </.header>
         </div>
 
+        <%!-- Kept in the DOM (hidden) after saving, so "continue" can submit it to log in. --%>
         <.form
           for={@form}
           id="registration_form"
+          class={[@recovery_codes && "hidden"]}
           phx-submit="save"
           phx-change="validate"
           action={~p"/users/log-in?_action=registered"}
@@ -67,7 +85,7 @@ defmodule NoctiaWeb.UserLive.Registration do
     if Accounts.registration_open?() do
       {:ok,
        socket
-       |> assign(trigger_submit: false)
+       |> assign(trigger_submit: false, recovery_codes: nil)
        |> assign_form(Accounts.change_user_registration())}
     else
       {:ok,
@@ -80,9 +98,8 @@ defmodule NoctiaWeb.UserLive.Registration do
   @impl true
   def handle_event("save", %{"user" => user_params}, socket) do
     case Accounts.register_user(user_params) do
-      {:ok, _user} ->
-        # Submit the form over HTTP to the session controller to log in.
-        {:noreply, assign(socket, trigger_submit: true)}
+      {:ok, {_user, codes}} ->
+        {:noreply, assign(socket, recovery_codes: codes)}
 
       {:error, %Ecto.Changeset{} = changeset} ->
         {:noreply, assign_form(socket, changeset)}
@@ -92,6 +109,11 @@ defmodule NoctiaWeb.UserLive.Registration do
   def handle_event("validate", %{"user" => user_params}, socket) do
     changeset = Accounts.change_user_registration(%Accounts.User{}, user_params)
     {:noreply, assign_form(socket, Map.put(changeset, :action, :validate))}
+  end
+
+  # Submit the (hidden) form over HTTP to the session controller to log in.
+  def handle_event("continue", _params, socket) do
+    {:noreply, assign(socket, trigger_submit: true)}
   end
 
   defp assign_form(socket, %Ecto.Changeset{} = changeset) do

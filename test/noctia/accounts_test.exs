@@ -9,7 +9,9 @@ defmodule Noctia.AccountsTest do
   describe "register_user/1" do
     test "registers the first user and closes registration" do
       assert Accounts.registration_open?()
-      assert {:ok, %User{} = user} = Accounts.register_user(valid_user_attributes())
+      assert {:ok, {%User{} = user, codes}} = Accounts.register_user(valid_user_attributes())
+      assert length(codes) == 10
+      assert Accounts.count_recovery_codes(user) == 10
       assert user.username == valid_username()
       assert is_binary(user.hashed_password)
       assert is_nil(user.password)
@@ -91,6 +93,71 @@ defmodule Noctia.AccountsTest do
       assert Accounts.get_user_by_username_and_password(user.username, "new valid password")
       assert Accounts.get_user_by_session_token(token)
       refute Accounts.get_user_by_session_token(other_token)
+    end
+  end
+
+  describe "reset_password_with_recovery_code/3" do
+    setup do
+      {user, codes} = user_with_recovery_codes_fixture()
+      %{user: user, code: hd(codes), token: Accounts.generate_user_session_token(user)}
+    end
+
+    @new_password %{password: "new valid password", password_confirmation: "new valid password"}
+
+    test "resets the password, consumes the code and expires sessions", ctx do
+      typed = ctx.code |> String.downcase() |> String.replace("-", " ")
+
+      assert {:ok, {_user, [_expired]}} =
+               Accounts.reset_password_with_recovery_code(ctx.user.username, typed, @new_password)
+
+      assert Accounts.get_user_by_username_and_password(ctx.user.username, "new valid password")
+      refute Accounts.get_user_by_session_token(ctx.token)
+      assert Accounts.count_recovery_codes(ctx.user) == 9
+
+      assert {:error, :invalid_code} =
+               Accounts.reset_password_with_recovery_code(
+                 ctx.user.username,
+                 ctx.code,
+                 @new_password
+               )
+    end
+
+    test "rejects unknown codes and usernames", ctx do
+      assert {:error, :invalid_code} =
+               Accounts.reset_password_with_recovery_code(
+                 ctx.user.username,
+                 "AAAA-BBBB",
+                 @new_password
+               )
+
+      assert {:error, :invalid_code} =
+               Accounts.reset_password_with_recovery_code("nobody", ctx.code, @new_password)
+    end
+
+    test "an invalid new password does not consume the code", ctx do
+      assert {:error, %Ecto.Changeset{} = changeset} =
+               Accounts.reset_password_with_recovery_code(ctx.user.username, ctx.code, %{
+                 password: "short"
+               })
+
+      assert %{password: ["should be at least 12 character(s)"]} = errors_on(changeset)
+      assert Accounts.count_recovery_codes(ctx.user) == 10
+    end
+  end
+
+  describe "regenerate_recovery_codes/2" do
+    test "replaces the codes only with the right password" do
+      {user, [old_code | _]} = user_with_recovery_codes_fixture()
+
+      assert {:error, :invalid_password} = Accounts.regenerate_recovery_codes(user, "wrong")
+      assert {:ok, new_codes} = Accounts.regenerate_recovery_codes(user, valid_user_password())
+      assert length(new_codes) == 10
+      assert Accounts.count_recovery_codes(user) == 10
+
+      assert {:error, :invalid_code} =
+               Accounts.reset_password_with_recovery_code(user.username, old_code, %{
+                 password: "new valid password"
+               })
     end
   end
 

@@ -23,12 +23,17 @@ defmodule Noctia.AccountsFixtures do
   end
 
   def user_fixture(attrs \\ %{}) do
-    {:ok, user} =
+    {user, _codes} = user_with_recovery_codes_fixture(attrs)
+    user
+  end
+
+  def user_with_recovery_codes_fixture(attrs \\ %{}) do
+    {:ok, {user, codes}} =
       attrs
       |> valid_user_attributes()
       |> Accounts.register_user()
 
-    user
+    {user, codes}
   end
 
   def user_scope_fixture do

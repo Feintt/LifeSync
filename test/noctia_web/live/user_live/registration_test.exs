@@ -41,7 +41,7 @@ defmodule NoctiaWeb.UserLive.RegistrationTest do
   end
 
   describe "register user" do
-    test "creates the account and logs the user in", %{conn: conn} do
+    test "shows the recovery codes, then logs the user in", %{conn: conn} do
       {:ok, lv, _html} = live(conn, ~p"/users/register")
 
       form =
@@ -54,6 +54,9 @@ defmodule NoctiaWeb.UserLive.RegistrationTest do
         )
 
       render_submit(form)
+      assert has_element?(lv, "#recovery-codes li", ~r/^\w{4}-/)
+
+      lv |> element("#continue-button") |> render_click()
       conn = follow_trigger_action(form, conn)
 
       assert redirected_to(conn) == ~p"/"

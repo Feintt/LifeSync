@@ -34,6 +34,12 @@ defmodule NoctiaWeb.UserLive.Login do
             Log in <span aria-hidden="true">→</span>
           </.button>
         </.form>
+
+        <p class="text-center text-sm">
+          <.link id="recover-link" navigate={~p"/users/recover"} class="link">
+            Forgot your password?
+          </.link>
+        </p>
       </div>
     </Layouts.app>
     """

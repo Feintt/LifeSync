@@ -52,6 +52,36 @@ defmodule NoctiaWeb.UserLive.Settings do
           Save Password
         </.button>
       </.form>
+
+      <div class="divider" />
+
+      <.header>
+        Recovery codes
+        <:subtitle>
+          <span id="recovery-codes-count">{@recovery_codes_count}</span>
+          unused codes left. Generating new codes invalidates the old ones.
+        </:subtitle>
+      </.header>
+
+      <div :if={@new_recovery_codes} id="new-recovery-codes" class="space-y-2">
+        <p class="text-sm font-semibold">Save these now, they will not be shown again:</p>
+        <ul class="grid grid-cols-1 gap-1 rounded-box bg-base-200 p-4 font-mono text-sm">
+          <li :for={code <- @new_recovery_codes}>{code}</li>
+        </ul>
+      </div>
+
+      <.form for={@recovery_form} id="recovery_codes_form" phx-submit="regenerate_codes">
+        <.input
+          field={@recovery_form[:current_password]}
+          type="password"
+          label="Current password"
+          autocomplete="current-password"
+          required
+        />
+        <.button variant="primary" phx-disable-with="Generating...">
+          Generate new codes
+        </.button>
+      </.form>
     </Layouts.app>
     """
   end
@@ -63,7 +93,10 @@ defmodule NoctiaWeb.UserLive.Settings do
     {:ok,
      socket
      |> assign(:user_token, session["user_token"])
-     |> assign(:password_form, to_form(Accounts.change_user_password(user)))}
+     |> assign(:password_form, to_form(Accounts.change_user_password(user)))
+     |> assign(:recovery_codes_count, Accounts.count_recovery_codes(user))
+     |> assign(:new_recovery_codes, nil)
+     |> assign(:recovery_form, to_form(%{}, as: "recovery"))}
   end
 
   @impl true
@@ -94,6 +127,25 @@ defmodule NoctiaWeb.UserLive.Settings do
 
       {:error, changeset} ->
         {:noreply, assign(socket, password_form: to_form(changeset, action: :update))}
+    end
+  end
+
+  def handle_event("regenerate_codes", %{"recovery" => %{"current_password" => password}}, socket) do
+    case Accounts.regenerate_recovery_codes(socket.assigns.current_scope.user, password) do
+      {:ok, codes} ->
+        {:noreply,
+         socket
+         |> assign(new_recovery_codes: codes, recovery_codes_count: length(codes))
+         |> assign(recovery_form: to_form(%{}, as: "recovery"))}
+
+      {:error, :invalid_password} ->
+        form =
+          to_form(%{"current_password" => ""},
+            as: "recovery",
+            errors: [current_password: {"is not valid", []}]
+          )
+
+        {:noreply, assign(socket, recovery_form: form)}
     end
   end
 end
